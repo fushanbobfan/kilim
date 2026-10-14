@@ -1,0 +1,25 @@
+{
+  "name": "kilim",
+  "version": "0.1.0",
+  "description": "Wave function collapse in the browser: paint a small sample, and a larger pattern is woven from its local rules one cell at a time.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "serve": "node scripts/serve.js",
+    "probe": "node scripts/probe.js"
+  },
+  "keywords": [
+    "wave-function-collapse",
+    "procedural-generation",
+    "constraint-propagation",
+    "creative-coding",
+    "canvas"
+  ],
+  "license": "MIT",
+  "author": "Jiayi Fan",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fushanbobfan/kilim.git"
+  },
+  "private": false
+}
