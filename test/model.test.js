@@ -171,3 +171,27 @@ test('undo clears a contradiction and the run can go on', () => {
   assert.equal(m.progress(), 0);
   assert.notEqual(m.run(createRng(2)), PROGRESS);
 });
+
+test('restricting a pixel keeps only tiles that paint it that colour', () => {
+  const b = sampleById('islands').bitmap;
+  const m = makeModel(b, { width: 16, height: 16, periodic: false });
+  const grass = b.palette.indexOf('#5c9a4a');
+  assert.ok(m.restrict(15, 15, grass));
+  assert.ok(m.restrict(4, 6, grass));
+  assert.equal(m.run(createRng(3)), DONE);
+  for (const [x, y] of [[15, 15], [4, 6]]) {
+    const { cell, offset } = m.sourceOf(x, y);
+    assert.equal(m.patterns[m.observed(cell)][offset], grass);
+  }
+  assert.ok(isConsistent(m));
+});
+
+test('a colour no tile can place there is a contradiction', () => {
+  const b = sampleById('maze').bitmap;
+  const m = makeModel(b, { width: 10, height: 10 });
+  // A 3 x 3 block of wall never occurs in the maze.
+  let ok = true;
+  for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) ok = ok && m.restrict(x, y, 0);
+  assert.equal(ok, false);
+  assert.equal(m.status, CONTRADICTION);
+});
