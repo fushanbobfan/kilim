@@ -2,6 +2,7 @@ import { createRng, randomSeed } from './rng.js';
 import { SAMPLES, sampleById, cloneBitmap, resizeBitmap } from './samples.js';
 import { extractPatterns, buildPropagator } from './patterns.js';
 import { OverlapModel, PROGRESS, DONE, CONTRADICTION } from './model.js';
+import { Weaver } from './weaver.js';
 import { renderBitmap, renderWave, renderEntropy, renderAtlas } from './render.js';
 import { fromQuery, toQuery, sanitize, MAX_COLOURS, MAX_SAMPLE_SIDE } from './settings.js';
 
@@ -17,8 +18,8 @@ let settings = fromQuery(location.search);
 let bitmap = null;
 let tiles = null;
 let model = null;
+let weaver = null;
 let rng = null;
-let attempts = 1;
 let running = true;
 let view = 'wave';
 let paint = 0;
@@ -51,6 +52,7 @@ function syncControls() {
   $('speed').value = settings.speed;
   $('speed-out').textContent = settings.speed;
   $('seed').value = settings.seed;
+  $('recovery').value = settings.recovery;
   $('sample-w').value = bitmap.width;
   $('sample-h').value = bitmap.height;
   syncSwatches();
@@ -104,6 +106,7 @@ function restart() {
   writeUrl();
   if (!tiles) {
     model = null;
+    weaver = null;
     draw();
     return;
   }
@@ -116,30 +119,18 @@ function restart() {
     outCanvas.parentElement.style.maxWidth = maxWidth;
     $('bar').parentElement.style.maxWidth = maxWidth;
     image = outCtx.createImageData(settings.width, settings.height);
-  } else {
-    model.clear();
   }
-  attempts = 1;
+  weaver = new Weaver(model, { mode: settings.recovery });
   rng = createRng(settings.seed);
   dirty = true;
 }
 
-function retry() {
-  attempts++;
-  model.clear();
-  rng = createRng((settings.seed + attempts - 1) >>> 0);
-}
-
 function advance(budgetSteps, budgetMs) {
-  if (!model) return;
+  if (!weaver) return;
   const t0 = performance.now();
   for (let s = 0; s < budgetSteps; s++) {
-    const status = model.step(rng);
+    const status = weaver.step(rng);
     dirty = true;
-    if (status === CONTRADICTION && $('retry').checked && attempts < 200) {
-      retry();
-      continue;
-    }
     if (status !== PROGRESS) break;
     if (performance.now() - t0 > budgetMs) break;
   }
@@ -174,12 +165,15 @@ function statusText() {
   if (error) return `Cannot build tiles: ${error}.`;
   if (!model) return '';
   const pct = Math.round(model.progress() * 100);
-  const tries = attempts > 1 ? ` · attempt ${attempts}` : '';
-  if (model.status === DONE) return `Done: ${model.decisions} choices${tries}.`;
+  const extra = [];
+  if (weaver.backtracks) extra.push(`${weaver.backtracks} backed up`);
+  if (weaver.restarts) extra.push(`${weaver.restarts} restarted`);
+  const tries = extra.length ? ` · ${extra.join(', ')}` : '';
+  if (model.status === DONE) return `Done: ${weaver.choices} choices${tries}.`;
   if (model.status === CONTRADICTION) {
-    return `Contradiction after ${model.decisions} choices: a cell ran out of tiles${tries}. Restart or try another seed.`;
+    return `Contradiction after ${weaver.choices} choices: a cell ran out of tiles${tries}. Restart or try another seed.`;
   }
-  return `${pct}% decided · ${model.decisions} choices${tries}${running ? '' : ' · paused'}`;
+  return `${pct}% decided · ${weaver.choices} choices${tries}${running ? '' : ' · paused'}`;
 }
 
 function draw() {
@@ -282,6 +276,7 @@ $('periodic-output').addEventListener('change', (e) => setSetting('periodicOutpu
 $('width').addEventListener('change', (e) => setSetting('width', e.target.value, false));
 $('height').addEventListener('change', (e) => setSetting('height', e.target.value, false));
 $('seed').addEventListener('change', (e) => setSetting('seed', e.target.value, false));
+$('recovery').addEventListener('change', (e) => setSetting('recovery', e.target.value, false));
 $('speed').addEventListener('input', (e) => {
   settings = sanitize({ ...settings, speed: e.target.value });
   $('speed-out').textContent = settings.speed;

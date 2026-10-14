@@ -69,7 +69,13 @@
             <label>Height <input id="height" type="number" min="8" max="96" /></label>
           </div>
           <label class="check"><input id="periodic-output" type="checkbox" /> Output wraps (tiles seamlessly)</label>
-          <label class="check"><input id="retry" type="checkbox" checked /> Start again on a contradiction</label>
+          <label>On a contradiction
+            <select id="recovery">
+              <option value="backtrack">back up and choose again</option>
+              <option value="restart">start again</option>
+              <option value="stop">stop</option>
+            </select>
+          </label>
           <label>Steps per frame <output id="speed-out"></output></label>
           <input id="speed" type="range" min="1" max="400" aria-label="Steps per frame" />
           <div class="row">
