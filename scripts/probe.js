@@ -2,6 +2,7 @@
 // many attempts and choices it took, and optionally save the result as PNG.
 // Usage: node scripts/probe.js [--sample maze] [--size 48] [--seed 1]
 //        [--N 3] [--symmetry 8] [--wrap 0|1] [--runs 10] [--png out.png]
+//        [--mode backtrack|restart|stop]
 
 import { writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
@@ -9,6 +10,7 @@ import { createRng } from '../src/rng.js';
 import { sampleById, SAMPLES } from '../src/samples.js';
 import { extractPatterns, buildPropagator } from '../src/patterns.js';
 import { OverlapModel, DONE } from '../src/model.js';
+import { Weaver } from '../src/weaver.js';
 import { renderWave } from '../src/render.js';
 
 function args() {
@@ -75,6 +77,7 @@ const periodic = a.wrap === undefined ? sample.settings.periodicOutput : a.wrap 
 const size = Number(a.size || 48);
 const seed = Number(a.seed || 1);
 const runs = Number(a.runs || 1);
+const mode = a.mode || 'backtrack';
 
 const t0 = performance.now();
 const ex = extractPatterns(sample.bitmap, { N, periodic: sample.periodic, symmetry });
@@ -85,13 +88,15 @@ let done = 0;
 let last = null;
 for (let r = 0; r < runs; r++) {
   const model = new OverlapModel({ ...ex, propagator, width: size, height: size, periodic });
+  const weaver = new Weaver(model, { mode });
   const t1 = performance.now();
-  const status = model.run(createRng(seed + r));
+  const status = weaver.run(createRng(seed + r));
   if (status === DONE) done++;
-  console.log(`seed ${seed + r}: ${status} after ${model.decisions} choices in ${(performance.now() - t1).toFixed(0)} ms`);
+  const ms = (performance.now() - t1).toFixed(0);
+  console.log(`seed ${seed + r}: ${status} after ${weaver.choices} choices, ${weaver.backtracks} backed up, ${weaver.restarts} restarted, ${ms} ms`);
   if (status === DONE && !last) last = model;
 }
-console.log(`${done} of ${runs} runs finished at ${size} x ${size}${periodic ? ', wrapping' : ''}`);
+console.log(`${done} of ${runs} runs finished at ${size} x ${size}${periodic ? ', wrapping' : ''} (${mode})`);
 
 if (a.png && last) {
   const rgba = renderWave(last, sample.bitmap.palette, new Uint8ClampedArray(size * size * 4));
