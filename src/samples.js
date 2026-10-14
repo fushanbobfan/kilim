@@ -1,10 +1,13 @@
 // Built-in sample bitmaps. Each is drawn as rows of characters, one character
 // per pixel, with a key from character to colour. A bitmap is stored as a
-// palette plus one palette index per pixel.
+// palette plus one palette index per pixel. Each sample also carries the
+// settings that suit it: one whose stripes repeat every few rows cannot wrap
+// around an output of arbitrary height, so it starts with a non-wrapping output.
 
 const SOURCES = [
   {
     id: 'kilim',
+    settings: { N: 3, symmetry: 8, periodicOutput: false },
     name: 'Kilim diamond',
     periodic: true,
     key: { r: '#a8322d', k: '#2b1d1a', y: '#e0a83a', w: '#f2e6cf' },
@@ -25,6 +28,7 @@ const SOURCES = [
   },
   {
     id: 'bricks',
+    settings: { N: 3, symmetry: 2, periodicOutput: false },
     name: 'Bricks',
     periodic: true,
     key: { m: '#d9d2c3', b: '#9b4a32', d: '#7d3a27' },
@@ -39,6 +43,7 @@ const SOURCES = [
   },
   {
     id: 'maze',
+    settings: { N: 3, symmetry: 8, periodicOutput: true },
     name: 'Maze',
     periodic: true,
     key: { '#': '#1f2a44', '.': '#f4f1e8' },
@@ -55,6 +60,7 @@ const SOURCES = [
   },
   {
     id: 'pipes',
+    settings: { N: 3, symmetry: 2, periodicOutput: true },
     name: 'Pipes',
     periodic: true,
     key: { '.': '#14212b', p: '#4fb3a9', j: '#f0c24b' },
@@ -73,6 +79,7 @@ const SOURCES = [
   },
   {
     id: 'islands',
+    settings: { N: 3, symmetry: 8, periodicOutput: true },
     name: 'Islands',
     periodic: true,
     key: { '~': '#2f6f9f', ':': '#e8d39a', g: '#5c9a4a', t: '#2f6b35' },
@@ -114,6 +121,7 @@ export const SAMPLES = SOURCES.map((s) => ({
   id: s.id,
   name: s.name,
   periodic: s.periodic,
+  settings: s.settings,
   bitmap: parseRows(s.rows, s.key),
 }));
 

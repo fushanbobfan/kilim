@@ -9,6 +9,8 @@ test('every built-in sample parses into a rectangular bitmap with a palette', ()
     assert.equal(b.pixels.length, b.width * b.height, s.id);
     for (const p of b.pixels) assert.ok(p < b.palette.length, s.id);
     for (const c of b.palette) assert.match(c, /^#[0-9a-f]{6}$/);
+    assert.ok([1, 2, 4, 8].includes(s.settings.symmetry), s.id);
+    assert.equal(typeof s.settings.periodicOutput, 'boolean');
     assert.equal(new Set(b.palette).size, b.palette.length, `${s.id} repeats a colour`);
   }
 });
