@@ -26,6 +26,7 @@ browser, and optionally save it, with:
 
 ```bash
 node scripts/probe.js --sample maze --size 64 --runs 10 --png maze.png
+node scripts/probe.js --sample pipes --symmetry 1 --size 64 --runs 10 --mode restart
 ```
 
 ## How it works
@@ -52,9 +53,36 @@ every neighbouring cell the model keeps a count of supporting tiles in each
 direction (AC-4 arc consistency), and a tile whose support in any direction
 drops to zero is banned, which may cascade further.
 
-**Contradictions.** Propagation can empty a cell. The page then starts again
-with the next seed, up to 200 attempts; the attempt count is shown. Seeds are
-consecutive, so a shared link replays the same run.
+**Contradictions.** Propagation can empty a cell. What happens next is a
+setting:
+
+- *Back up* (the default). Before each choice the model marks its undo trail,
+  a list of every tile banned so far in order. On a contradiction it undoes
+  back to the latest mark and chooses again. A mark that fails three times is
+  dropped for the one before it; only the last eight are kept. Support counts
+  keep falling after a tile is banned, so each count is a plain sum over
+  banned tiles and undoing a ban simply gives its support back. Undo costs as
+  much as the work it reverses.
+- *Start again*: clear the output and carry on with the same random stream.
+- *Stop*: leave the contradiction on screen, marked in magenta.
+
+Backing up has a budget of 32 per attempt, after which the output starts
+again (at most 200 times). Some contradictions are seeded far from where they
+show up, and undoing the last few choices never reaches the cause.
+
+How much this helps depends on the sample. Ten seeds each with
+`node scripts/probe.js --symmetry 1 --wrap 1 --runs 10 --mode ...`, times
+from one laptop:
+
+| Sample as drawn, wrapping | Start again | Back up |
+| --- | --- | --- |
+| Pipes, 64 × 64 | 9 of 10 finish within 200 restarts; 175,008 choices, 107 s | 10 of 10; 7,646 choices, 14 s |
+| Pipes, 48 × 48 | 10 of 10; 12,662 choices, 5.7 s | 10 of 10; 4,238 choices, 5.5 s |
+| Maze, 48 × 48 | 10 of 10; 764 choices, 0.4 s | 10 of 10; 948 choices, 3.8 s |
+
+The maze is so tightly constrained that one choice settles large areas, and
+its rare contradictions start far away, so backing up mostly spends its
+budget before restarting. Runs replay exactly from the seed in either mode.
 
 **Edges.** A wrapping output joins its left edge to its right and its top to
 its bottom, so the result tiles seamlessly; a sample with a fixed stripe
@@ -76,6 +104,7 @@ that ran out of tiles.
 | Window size | N = 2, 3 or 4; larger windows copy more of the sample's structure |
 | Symmetry | As drawn, plus mirror, four or all eight rotations and mirrors |
 | Sample wraps | Whether windows may run across the sample's edges |
+| On a contradiction | Back up, start again, or stop |
 | Output size, wraps | 8 to 96 cells per side; seamless tiling on or off |
 | Steps per frame | Animation speed |
 | Seed | Reproducible runs; New seed or `R` picks another |
@@ -90,7 +119,8 @@ sample. Save PNG exports the output scaled up without smoothing.
 | --- | --- |
 | `src/samples.js` | Built-in samples as character rows, with suited settings |
 | `src/patterns.js` | Window extraction, symmetries, overlap test and propagator |
-| `src/model.js` | Wave, entropy, observation and AC-4 propagation |
+| `src/model.js` | Wave, entropy, observation, AC-4 propagation and the undo trail |
+| `src/weaver.js` | Contradiction handling: back up, start again or stop |
 | `src/render.js` | Sample, wave, entropy and tile atlas as RGBA buffers |
 | `src/settings.js` | Ranges and the share-link format |
 | `src/rng.js` | Seeded mulberry32 generator |
