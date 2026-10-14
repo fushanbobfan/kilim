@@ -13,7 +13,7 @@ export const RESTART = 'restart';
 export const BACKTRACK = 'backtrack';
 
 export class Weaver {
-  constructor(model, { mode = BACKTRACK, interval = 1, keep = 8, failuresPerSave = 3, budget = 32, maxRestarts = 200 } = {}) {
+  constructor(model, { mode = BACKTRACK, interval = 1, keep = 8, failuresPerSave = 3, budget = 32, maxRestarts = 200, prepare = null } = {}) {
     this.model = model;
     this.mode = mode;
     this.interval = interval;
@@ -21,16 +21,27 @@ export class Weaver {
     this.failuresPerSave = failuresPerSave;
     this.budget = budget;
     this.maxRestarts = maxRestarts;
+    // Applied after every clear, before any choice: pinned pixels, for one.
+    // Marks are taken after it, so backing up never undoes it.
+    this.prepare = prepare;
     this.reset();
   }
 
   reset() {
-    this.model.clear();
+    this.clearModel();
     this.saves = [];
     this.backtracks = 0;
     this.attemptBacktracks = 0;
     this.restarts = 0;
     this.choices = 0;
+  }
+
+  clearModel() {
+    this.model.clear();
+    // A contradiction straight after preparing has nothing random to blame,
+    // so no restart can fix it.
+    this.infeasible = Boolean(this.prepare) && this.prepare(this.model) === false;
+    if (this.infeasible) this.model.status = CONTRADICTION;
   }
 
   get status() {
@@ -57,9 +68,9 @@ export class Weaver {
         this.saves.pop();
       }
     }
-    if (this.mode === STOP || this.restarts >= this.maxRestarts) return false;
+    if (this.mode === STOP || this.infeasible || this.restarts >= this.maxRestarts) return false;
     this.restarts++;
-    m.clear();
+    this.clearModel();
     this.saves = [];
     this.attemptBacktracks = 0;
     return true;
