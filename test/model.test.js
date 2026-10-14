@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRng } from '../src/rng.js';
 import { parseRows, sampleById } from '../src/samples.js';
 import { extractPatterns, buildPropagator } from '../src/patterns.js';
-import { OverlapModel, isConsistent, DONE, CONTRADICTION, PROGRESS } from '../src/model.js';
+import { OverlapModel, isConsistent, restoreWave, DONE, CONTRADICTION, PROGRESS } from '../src/model.js';
 
 function makeModel(bitmap, { N = 3, symmetry = 8, periodicInput = true, width = 24, height = 24, periodic = true } = {}) {
   const ex = extractPatterns(bitmap, { N, periodic: periodicInput, symmetry });
@@ -120,4 +120,47 @@ test('pattern choice follows the weights', () => {
   let zeros = 0;
   for (let i = 0; i < 1600; i++) if (m.observed(i) === 0) zeros++;
   assert.ok(Math.abs(zeros / 1600 - 0.75) < 0.05, `share ${zeros / 1600}`);
+});
+
+function supportsMatch(m, fresh) {
+  for (let i = 0; i < m.W * m.H; i++) {
+    for (let t = 0; t < m.T; t++) {
+      if (!m.wave[i * m.T + t]) continue;
+      for (let d = 0; d < 4; d++) {
+        const c = (i * m.T + t) * 4 + d;
+        if (m.compatible[c] !== fresh.compatible[c]) return `cell ${i} tile ${t} dir ${d}: ${m.compatible[c]} vs ${fresh.compatible[c]}`;
+      }
+    }
+    if (m.sumsOfOnes[i] !== fresh.sumsOfOnes[i]) return `cell ${i} count`;
+    if (Math.abs(m.entropies[i] - fresh.entropies[i]) > 1e-9) return `cell ${i} entropy`;
+  }
+  return '';
+}
+
+test('restoring a saved wave rebuilds the same support counts and entropies', () => {
+  for (const periodic of [true, false]) {
+    const m = makeModel(sampleById('pipes').bitmap, { symmetry: 2, width: 20, height: 16, periodic });
+    m.run(createRng(6), 60);
+    assert.equal(m.status, PROGRESS);
+    const fresh = makeModel(sampleById('pipes').bitmap, { symmetry: 2, width: 20, height: 16, periodic });
+    restoreWave(fresh, m.wave);
+    assert.equal(supportsMatch(m, fresh), '', `periodic ${periodic}`);
+    // Both continue identically from here.
+    m.run(createRng(8));
+    fresh.run(createRng(8));
+    assert.deepEqual([...fresh.wave], [...m.wave]);
+  }
+});
+
+test('restoring clears a contradiction', () => {
+  const b = sampleById('maze').bitmap;
+  const m = makeModel(b, { width: 10, height: 10 });
+  const saved = m.wave.slice();
+  for (let t = 0; t < m.T; t++) m.ban(0, t);
+  m.propagate();
+  m.status = CONTRADICTION;
+  restoreWave(m, saved);
+  assert.equal(m.status, PROGRESS);
+  assert.equal(m.contradiction, -1);
+  assert.equal(m.progress(), 0);
 });

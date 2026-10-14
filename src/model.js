@@ -237,3 +237,61 @@ export function isConsistent(model) {
   }
   return true;
 }
+
+// Rebuild every derived array from a saved wave: entropy sums from the
+// surviving tiles, and support counts from the tiles still possible in each
+// neighbour, exactly as propagation would have left them.
+export function restoreWave(model, wave) {
+  const { W, H, T, N, propagator, compatible, weights } = model;
+  model.wave.set(wave);
+  for (let i = 0; i < W * H; i++) {
+    let ones = 0;
+    let sw = 0;
+    let swl = 0;
+    for (let t = 0; t < T; t++) {
+      if (!wave[i * T + t]) continue;
+      ones++;
+      sw += weights[t];
+      swl += model.weightLogWeights[t];
+    }
+    model.sumsOfOnes[i] = ones;
+    model.sumsOfWeights[i] = sw;
+    model.sumsOfWeightLogWeights[i] = swl;
+    model.entropies[i] = sw > 0 ? Math.log(sw) - swl / sw : 0;
+  }
+  for (let i2 = 0; i2 < W * H; i2++) {
+    const x2 = i2 % W;
+    const y2 = (i2 - x2) / W;
+    const inRange = model.periodic || (x2 + N <= W && y2 + N <= H);
+    for (let d = 0; d < 4; d++) {
+      const o = (d + 2) % 4;
+      // Supports arrive from the cell one step against direction d.
+      let x1 = x2 - DX[d];
+      let y1 = y2 - DY[d];
+      let i1 = -1;
+      if (model.periodic) {
+        i1 = ((x1 + W) % W) + ((y1 + H) % H) * W;
+      } else if (inRange && x1 >= 0 && y1 >= 0 && x1 < W && y1 < H) {
+        i1 = x1 + y1 * W;
+      }
+      for (let t2 = 0; t2 < T; t2++) {
+        const c = (i2 * T + t2) * 4 + d;
+        if (!wave[i2 * T + t2]) {
+          compatible[c] = 0;
+          continue;
+        }
+        const list = propagator[o][t2];
+        if (i1 < 0) {
+          compatible[c] = list.length;
+          continue;
+        }
+        let n = 0;
+        for (let l = 0; l < list.length; l++) if (wave[i1 * T + list[l]]) n++;
+        compatible[c] = n;
+      }
+    }
+  }
+  model.stackSize = 0;
+  model.contradiction = -1;
+  model.status = PROGRESS;
+}
