@@ -4,7 +4,7 @@ import { createRng } from '../src/rng.js';
 import { parseRows, sampleById } from '../src/samples.js';
 import { extractPatterns, buildPropagator } from '../src/patterns.js';
 import { OverlapModel } from '../src/model.js';
-import { hexToRgb, renderBitmap, renderWave, renderEntropy, CONTRADICTION_RGB } from '../src/render.js';
+import { hexToRgb, renderBitmap, renderWave, renderEntropy, renderAtlas, CONTRADICTION_RGB } from '../src/render.js';
 
 function model(bitmap, width, height, symmetry = 1) {
   const ex = extractPatterns(bitmap, { N: 2, symmetry });
@@ -60,4 +60,28 @@ test('entropy is brightest before any decision and dark once decided', () => {
   const after = renderEntropy(m, new Uint8ClampedArray(144));
   assert.ok(before[0] > 200);
   assert.ok(after[0] < 30);
+});
+
+test('the atlas orders tiles by weight and leaves transparent gaps', () => {
+  const patterns = [Uint8Array.from([0, 0, 0, 0]), Uint8Array.from([1, 1, 1, 1]), Uint8Array.from([0, 1, 0, 1])];
+  const weights = Float64Array.from([1, 5, 3]);
+  const a = renderAtlas(patterns, weights, 2, ['#000000', '#ffffff'], { columns: 2, scale: 2 });
+  assert.deepEqual(a.order, [1, 2, 0]);
+  assert.equal(a.cell, 6);
+  assert.equal(a.width, 12);
+  assert.equal(a.height, 12);
+  assert.equal(a.data[3], 0);
+  const px = (x, y) => a.data[(y * a.width + x) * 4];
+  assert.equal(px(1, 1), 255);
+  assert.equal(px(7, 1), 0);
+  assert.equal(px(9, 1), 255);
+  assert.equal(px(1, 7), 0);
+  assert.equal(a.data[((7 * a.width) + 11) * 4 + 3], 0);
+});
+
+test('the atlas stops at its limit', () => {
+  const patterns = Array.from({ length: 10 }, (_, k) => Uint8Array.from([k % 2, 0, 0, 0]));
+  const a = renderAtlas(patterns, new Float64Array(10).fill(1), 2, ['#000000', '#ffffff'], { limit: 4, columns: 8 });
+  assert.equal(a.order.length, 4);
+  assert.equal(a.cols, 4);
 });

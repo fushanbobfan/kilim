@@ -74,3 +74,35 @@ export function renderEntropy(model, out) {
   }
   return out;
 }
+
+// The most frequent tiles side by side, each scaled up with a one-pixel gap,
+// wrapping into rows of `columns`.
+export function layoutAtlas(patterns, weights, N, { columns = 16, scale = 4, limit = 96 } = {}) {
+  const order = patterns.map((_, t) => t).sort((a, b) => weights[b] - weights[a] || a - b).slice(0, limit);
+  const cell = N * scale + 2;
+  const cols = Math.max(1, Math.min(columns, order.length));
+  const rows = Math.max(1, Math.ceil(order.length / cols));
+  return { order, cell, cols, rows, width: cols * cell, height: rows * cell };
+}
+
+export function renderAtlas(patterns, weights, N, palette, options = {}) {
+  const scale = options.scale || 4;
+  const layout = layoutAtlas(patterns, weights, N, options);
+  const rgb = palette.map(hexToRgb);
+  const data = new Uint8ClampedArray(layout.width * layout.height * 4);
+  layout.order.forEach((t, k) => {
+    const ox = (k % layout.cols) * layout.cell + 1;
+    const oy = Math.floor(k / layout.cols) * layout.cell + 1;
+    for (let y = 0; y < N * scale; y++) {
+      for (let x = 0; x < N * scale; x++) {
+        const c = rgb[patterns[t][Math.floor(x / scale) + Math.floor(y / scale) * N]];
+        const o = ((oy + y) * layout.width + ox + x) * 4;
+        data[o] = c[0];
+        data[o + 1] = c[1];
+        data[o + 2] = c[2];
+        data[o + 3] = 255;
+      }
+    }
+  });
+  return { ...layout, data };
+}
