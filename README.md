@@ -95,8 +95,8 @@ pixel and propagates, before the first choice of every attempt, so backing up
 and restarting keep the pins. If the pins alone already empty a cell, no
 amount of retrying can help, and the page says so instead of restarting. On
 the islands, for instance, a single grass pixel or a short stroke is fine,
-but a straight run of six grass pixels cannot fit: no island in the sample is
-that wide.
+but a straight run of six grass pixels cannot: the sample's islands are too
+small for any arrangement of its windows to hold one.
 
 **What the views show.** The pattern view paints each pixel with the
 weighted mean colour of the tiles still possible there, so the picture comes
