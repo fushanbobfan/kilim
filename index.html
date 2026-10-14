@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>kilim · wave function collapse</title>
+    <meta name="description" content="Paint a small sample and watch a larger pattern woven from its local rules, one cell at a time, by wave function collapse." />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>kilim</h1>
+      <p class="subtitle">
+        Paint a small sample. Every small square window in it becomes a tile, and a larger picture is woven so
+        that each of its windows is one of those tiles. Every cell starts undecided; the most constrained cell is
+        settled first, and the choice ripples out to rule out whatever no longer fits beside it.
+      </p>
+    </header>
+
+    <main>
+      <section class="stage">
+        <div class="canvas-wrap">
+          <canvas id="output" role="img" aria-label="Generated pattern"></canvas>
+        </div>
+        <div class="progress" aria-hidden="true"><div id="bar"></div></div>
+        <p class="status" id="status" aria-live="polite"></p>
+        <p class="hint">Space runs or pauses, S takes one step, R starts again with a new seed, E switches to the entropy map.</p>
+        <h2 class="atlas-title">Tiles <output id="tile-count"></output></h2>
+        <canvas id="atlas" class="atlas" role="img" aria-label="Tiles taken from the sample, most frequent first"></canvas>
+      </section>
+
+      <aside class="panel">
+        <fieldset>
+          <legend>Sample</legend>
+          <label for="sample" class="sr-only">Built-in sample</label>
+          <select id="sample"></select>
+          <canvas id="editor" class="editor" role="img" aria-label="Sample: click or drag to paint with the chosen colour"></canvas>
+          <div class="swatches" id="swatches" role="radiogroup" aria-label="Paint colour"></div>
+          <div class="row">
+            <label>Width <input id="sample-w" type="number" min="2" max="24" /></label>
+            <label>Height <input id="sample-h" type="number" min="2" max="24" /></label>
+          </div>
+          <div class="row">
+            <label class="colour">Colour <input id="colour" type="color" /></label>
+            <button id="add-colour" type="button">Add colour</button>
+          </div>
+          <p class="note">Click or drag on the sample to paint. Changing a colour recolours every pixel that uses it.</p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Tiles</legend>
+          <label>Window size <select id="N"><option value="2">2 × 2</option><option value="3">3 × 3</option><option value="4">4 × 4</option></select></label>
+          <label>Symmetry
+            <select id="symmetry">
+              <option value="1">as drawn</option>
+              <option value="2">plus mirror</option>
+              <option value="4">plus turns and mirror (4)</option>
+              <option value="8">all rotations and mirrors</option>
+            </select>
+          </label>
+          <label class="check"><input id="periodic-input" type="checkbox" /> Sample wraps at its edges</label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Output</legend>
+          <div class="row">
+            <label>Width <input id="width" type="number" min="8" max="96" /></label>
+            <label>Height <input id="height" type="number" min="8" max="96" /></label>
+          </div>
+          <label class="check"><input id="periodic-output" type="checkbox" /> Output wraps (tiles seamlessly)</label>
+          <label class="check"><input id="retry" type="checkbox" checked /> Start again on a contradiction</label>
+          <label>Steps per frame <output id="speed-out"></output></label>
+          <input id="speed" type="range" min="1" max="400" aria-label="Steps per frame" />
+          <div class="row">
+            <label>Seed <input id="seed" type="number" min="0" max="4294967295" /></label>
+            <button id="reseed" type="button" title="New seed (R)">New seed</button>
+          </div>
+          <div class="segmented" role="radiogroup" aria-label="View">
+            <label><input type="radio" name="view" value="wave" checked /> Pattern</label>
+            <label><input type="radio" name="view" value="entropy" /> Entropy</label>
+          </div>
+          <div class="buttons">
+            <button id="run" type="button">Pause</button>
+            <button id="step" type="button">Step</button>
+            <button id="restart" type="button">Restart</button>
+          </div>
+          <div class="buttons">
+            <button id="png" type="button">Save PNG</button>
+            <button id="link" type="button">Copy link</button>
+          </div>
+        </fieldset>
+      </aside>
+    </main>
+
+    <footer>
+      After Maxim Gumin's wave function collapse (2016), overlapping model.
+      <a href="https://github.com/fushanbobfan/kilim">Source</a> · MIT licence.
+    </footer>
+
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>
