@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { defaults, sanitize, toQuery, fromQuery, encodeBitmap, decodeBitmap } from '../src/settings.js';
+import { defaults, sanitize, toQuery, fromQuery, encodeBitmap, decodeBitmap, encodePins, decodePins } from '../src/settings.js';
 import { sampleById } from '../src/samples.js';
 
 test('defaults produce an empty query', () => {
@@ -45,4 +45,17 @@ test('malformed painted samples are dropped', () => {
   assert.equal(decodeBitmap('1.1.000000.0'), null);
   assert.equal(decodeBitmap('30.2.000000.' + '0'.repeat(60)), null);
   assert.equal(decodeBitmap('nonsense'), null);
+});
+
+test('pins round-trip through a query', () => {
+  const pins = [[0, 0, 1], [47, 12, 3], [5, 47, 0]];
+  const back = fromQuery(toQuery({ ...defaults(), pins }));
+  assert.deepEqual(back.pins, pins);
+  assert.deepEqual(fromQuery('').pins, []);
+});
+
+test('pins outside the output, with unknown colours, repeated or malformed are dropped', () => {
+  const text = encodePins([[1, 1, 0], [9, 1, 0], [1, 9, 0], [2, 2, 5], [1, 1, 1]]) + '_x.1.2_3.3';
+  assert.deepEqual(decodePins(text, 8, 8, 4), [[1, 1, 0]]);
+  assert.deepEqual(decodePins('', 8, 8, 4), []);
 });

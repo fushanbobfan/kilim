@@ -205,6 +205,18 @@ export class OverlapModel {
     this.decisions++;
   }
 
+  // Keep only the tiles that put colour `colour` on output pixel (x, y), and
+  // propagate. Returns false if that empties a cell.
+  restrict(x, y, colour) {
+    const { T, patterns } = this;
+    const { cell, offset } = this.sourceOf(x, y);
+    for (let t = 0; t < T; t++) {
+      if (this.wave[cell * T + t] && patterns[t][offset] !== colour) this.ban(cell, t);
+    }
+    if (!this.propagate()) this.status = CONTRADICTION;
+    return this.status !== CONTRADICTION;
+  }
+
   // One observation plus its propagation.
   step(rng) {
     if (this.status !== PROGRESS) return this.status;

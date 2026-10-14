@@ -25,6 +25,10 @@ let view = 'wave';
 let paint = 0;
 let image = null;
 let error = '';
+// Pinned output pixels: pinKey(x, y) -> [x, y, colour]. Keys do not depend
+// on the output width, so pins stay put when the output is resized.
+let pins = new Map();
+const pinKey = (x, y) => x + y * 4096;
 let dirty = true;
 
 function initialBitmap() {
@@ -81,6 +85,7 @@ function syncSwatches() {
 }
 
 function writeUrl() {
+  settings.pins = [...pins.values()];
   const q = toQuery(settings);
   history.replaceState(null, '', q ? `?${q}` : location.pathname);
 }
@@ -103,6 +108,7 @@ function rebuildTiles() {
 }
 
 function restart() {
+  for (const [k, [x, y]] of pins) if (x >= settings.width || y >= settings.height) pins.delete(k);
   writeUrl();
   if (!tiles) {
     model = null;
@@ -120,9 +126,20 @@ function restart() {
     $('bar').parentElement.style.maxWidth = maxWidth;
     image = outCtx.createImageData(settings.width, settings.height);
   }
-  weaver = new Weaver(model, { mode: settings.recovery });
+  weaver = new Weaver(model, { mode: settings.recovery, prepare: pins.size ? applyPins : null });
+  syncPinCount();
   rng = createRng(settings.seed);
   dirty = true;
+}
+
+function applyPins(m) {
+  for (const [x, y, c] of pins.values()) if (!m.restrict(x, y, c)) return false;
+  return true;
+}
+
+function syncPinCount() {
+  $('pin-count').textContent = pins.size ? `${pins.size} pinned pixel${pins.size === 1 ? '' : 's'}` : 'No pins';
+  $('clear-pins').disabled = pins.size === 0;
 }
 
 function advance(budgetSteps, budgetMs) {
@@ -170,6 +187,7 @@ function statusText() {
   if (weaver.restarts) extra.push(`${weaver.restarts} restarted`);
   const tries = extra.length ? ` · ${extra.join(', ')}` : '';
   if (model.status === DONE) return `Done: ${weaver.choices} choices${tries}.`;
+  if (weaver.infeasible) return 'The pinned pixels cannot all hold with these tiles. Remove some pins or clear them.';
   if (model.status === CONTRADICTION) {
     return `Contradiction after ${weaver.choices} choices: a cell ran out of tiles${tries}. Restart or try another seed.`;
   }
@@ -213,6 +231,7 @@ function chooseSample(id) {
   }
   const s = sampleById(id);
   bitmap = cloneBitmap(s.bitmap);
+  pins.clear();
   settings = sanitize({
     ...settings,
     sample: id,
@@ -343,6 +362,71 @@ function stepOnce() {
   dirty = true;
 }
 
+// ----- pins -----
+
+function outputPixel(e) {
+  const r = outCanvas.getBoundingClientRect();
+  const x = Math.floor(((e.clientX - r.left) / r.width) * settings.width);
+  const y = Math.floor(((e.clientY - r.top) / r.height) * settings.height);
+  if (x < 0 || y < 0 || x >= settings.width || y >= settings.height) return null;
+  return [x, y];
+}
+
+let pinning = false;
+let pinsChanged = false;
+
+function pinAt(e) {
+  const p = outputPixel(e);
+  if (!p || !model) return;
+  const [x, y] = p;
+  const k = pinKey(x, y);
+  if (e.shiftKey) {
+    if (pins.delete(k)) pinsChanged = true;
+    return;
+  }
+  const old = pins.get(k);
+  if (old && old[2] === paint) return;
+  pins.set(k, [x, y, paint]);
+  pinsChanged = true;
+  // Show the pin straight away; the weave restarts with every pin on release.
+  model.restrict(x, y, paint);
+  dirty = true;
+}
+
+function setDrawing(on) {
+  $('draw-pins').checked = on;
+  outCanvas.classList.toggle('drawing', on);
+}
+
+outCanvas.addEventListener('pointerdown', (e) => {
+  if (!$('draw-pins').checked) return;
+  pinning = true;
+  pinsChanged = false;
+  running = false;
+  outCanvas.setPointerCapture(e.pointerId);
+  pinAt(e);
+});
+outCanvas.addEventListener('pointermove', (e) => {
+  if (pinning) pinAt(e);
+});
+const endPin = () => {
+  if (!pinning) return;
+  pinning = false;
+  if (pinsChanged) {
+    restart();
+    running = true;
+  }
+  syncPinCount();
+};
+outCanvas.addEventListener('pointerup', endPin);
+outCanvas.addEventListener('pointercancel', endPin);
+$('draw-pins').addEventListener('change', (e) => setDrawing(e.target.checked));
+$('clear-pins').addEventListener('click', () => {
+  pins.clear();
+  restart();
+  running = true;
+});
+
 for (const r of document.querySelectorAll('input[name="view"]')) {
   r.addEventListener('change', (e) => {
     view = e.target.value;
@@ -398,6 +482,8 @@ document.addEventListener('keydown', (e) => {
     reseed();
   } else if (e.key === 'e' || e.key === 'E') {
     setView(view === 'entropy' ? 'wave' : 'entropy');
+  } else if (e.key === 'p' || e.key === 'P') {
+    setDrawing(!$('draw-pins').checked);
   }
 });
 
@@ -405,6 +491,7 @@ document.addEventListener('keydown', (e) => {
 
 fillSampleSelect();
 bitmap = initialBitmap();
+for (const [x, y, c] of settings.pins) if (c < bitmap.palette.length) pins.set(pinKey(x, y), [x, y, c]);
 if (!settings.custom && location.search === '') {
   const s = sampleById(settings.sample);
   settings = sanitize({ ...settings, ...s.settings, periodicOutput: s.settings.periodicOutput, periodicInput: s.periodic });

@@ -94,3 +94,31 @@ test('reset clears saves and counters', () => {
   assert.equal(w.choices + w.backtracks + w.restarts, 0);
   assert.equal(w.model.progress(), 0);
 });
+
+test('prepared pins hold through backtracking and restarts', () => {
+  const pins = [[0, 0, 1], [7, 3, 0], [20, 20, 1], [31, 31, 0]];
+  const prepare = (m) => pins.every(([x, y, c]) => m.restrict(x, y, c));
+  for (const mode of [BACKTRACK, RESTART]) {
+    for (let seed = 1; seed <= 6; seed++) {
+      const w = new Weaver(makeModel('maze'), { mode, prepare });
+      assert.equal(w.run(createRng(seed)), DONE, `${mode} seed ${seed}`);
+      for (const [x, y, c] of pins) {
+        const { cell, offset } = w.model.sourceOf(x, y);
+        assert.equal(w.model.patterns[w.model.observed(cell)][offset], c);
+      }
+      assert.ok(isConsistent(w.model));
+    }
+  }
+});
+
+test('pins that cannot all hold stop at once instead of restarting', () => {
+  const prepare = (m) => {
+    for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) if (!m.restrict(x, y, 0)) return false;
+    return true;
+  };
+  const w = new Weaver(makeModel('maze'), { prepare });
+  assert.ok(w.infeasible);
+  assert.equal(w.run(createRng(1)), CONTRADICTION);
+  assert.equal(w.restarts, 0);
+  assert.equal(w.backtracks, 0);
+});

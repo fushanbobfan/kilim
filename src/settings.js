@@ -4,6 +4,7 @@
 export const MAX_COLOURS = 8;
 export const RECOVERY = ['backtrack', 'restart', 'stop'];
 export const MAX_SAMPLE_SIDE = 24;
+export const MAX_PINS = 2048;
 
 export const RANGES = {
   N: { min: 2, max: 4, def: 3 },
@@ -27,6 +28,7 @@ export function defaults() {
     seed: RANGES.seed.def,
     recovery: RECOVERY[0],
     custom: null,
+    pins: [],
   };
 }
 
@@ -72,6 +74,26 @@ export function decodeBitmap(text) {
   return { width, height, palette, pixels };
 }
 
+// Pinned output pixels as "x.y.c" triples joined by underscores.
+export function encodePins(pins) {
+  return pins.map(([x, y, c]) => `${x}.${y}.${c}`).join('_');
+}
+
+export function decodePins(text, width, height, colours) {
+  const pins = [];
+  const seen = new Set();
+  for (const part of (text || '').split('_')) {
+    const m = /^(\d+)\.(\d+)\.(\d)$/.exec(part);
+    if (!m) continue;
+    const [x, y, c] = [Number(m[1]), Number(m[2]), Number(m[3])];
+    if (x >= width || y >= height || c >= colours || seen.has(x + y * width)) continue;
+    seen.add(x + y * width);
+    pins.push([x, y, c]);
+    if (pins.length >= MAX_PINS) break;
+  }
+  return pins;
+}
+
 const KEYS = {
   sample: 's', N: 'n', symmetry: 'y', periodicInput: 'pi', periodicOutput: 'po',
   width: 'w', height: 'h', speed: 'v', seed: 'r', recovery: 'k',
@@ -88,6 +110,7 @@ export function toQuery(settings, base = defaults()) {
     q.delete('s');
     q.set('c', encodeBitmap(s.custom));
   }
+  if (settings.pins && settings.pins.length) q.set('p', encodePins(settings.pins));
   return q.toString();
 }
 
@@ -101,5 +124,7 @@ export function fromQuery(query, base = defaults()) {
   }
   const out = sanitize(s);
   out.custom = q.has('c') ? decodeBitmap(q.get('c')) : null;
+  // Pins are checked against the palette once the sample is known.
+  out.pins = q.has('p') ? decodePins(q.get('p'), out.width, out.height, MAX_COLOURS) : [];
   return out;
 }

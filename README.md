@@ -89,6 +89,15 @@ its bottom, so the result tiles seamlessly; a sample with a fixed stripe
 period only fits outputs whose size is a multiple of it. A non-wrapping output
 leaves the last N − 1 rows and columns to the final full windows.
 
+**Pins.** With drawing on, dragging across the output pins pixels to the
+paint colour. Each pin bans every tile that would put another colour on that
+pixel and propagates, before the first choice of every attempt, so backing up
+and restarting keep the pins. If the pins alone already empty a cell, no
+amount of retrying can help, and the page says so instead of restarting. On
+the islands, for instance, a single grass pixel or a short stroke is fine,
+but a straight run of six grass pixels cannot: the sample's islands are too
+small for any arrangement of its windows to hold one.
+
 **What the views show.** The pattern view paints each pixel with the
 weighted mean colour of the tiles still possible there, so the picture comes
 into focus as cells collapse. The entropy view maps the remaining entropy of
@@ -106,12 +115,13 @@ that ran out of tiles.
 | Sample wraps | Whether windows may run across the sample's edges |
 | On a contradiction | Back up, start again, or stop |
 | Output size, wraps | 8 to 96 cells per side; seamless tiling on or off |
+| Draw pins | Drag on the output to pin pixels to the paint colour; Shift removes; Clear pins |
 | Steps per frame | Animation speed |
 | Seed | Reproducible runs; New seed or `R` picks another |
-| Keys | `Space` run or pause, `S` one step, `R` new seed, `E` entropy view |
+| Keys | `Space` run or pause, `S` one step, `R` new seed, `E` entropy view, `P` draw pins |
 
 Copy link writes every changed setting into the address, including a painted
-sample. Save PNG exports the output scaled up without smoothing.
+sample and any pins. Save PNG exports the output scaled up without smoothing.
 
 ## Code layout
 
