@@ -25,7 +25,7 @@
         </div>
         <div class="progress" aria-hidden="true"><div id="bar"></div></div>
         <p class="status" id="status" aria-live="polite"></p>
-        <p class="hint">Space runs or pauses, S takes one step, R starts again with a new seed, E switches to the entropy map.</p>
+        <p class="hint">Space runs or pauses, S takes one step, R starts again with a new seed, E switches to the entropy map, P toggles drawing pins.</p>
         <h2 class="atlas-title">Tiles <output id="tile-count"></output></h2>
         <canvas id="atlas" class="atlas" role="img" aria-label="Tiles taken from the sample, most frequent first"></canvas>
       </section>
@@ -82,6 +82,12 @@
             <label>Seed <input id="seed" type="number" min="0" max="4294967295" /></label>
             <button id="reseed" type="button" title="New seed (R)">New seed</button>
           </div>
+          <label class="check"><input id="draw-pins" type="checkbox" /> Draw pins on the output</label>
+          <div class="row">
+            <output id="pin-count" class="grow"></output>
+            <button id="clear-pins" type="button">Clear pins</button>
+          </div>
+          <p class="note">With drawing on, drag across the output to pin pixels to the paint colour; hold Shift to remove pins. The weave then grows around them.</p>
           <div class="segmented" role="radiogroup" aria-label="View">
             <label><input type="radio" name="view" value="wave" checked /> Pattern</label>
             <label><input type="radio" name="view" value="entropy" /> Entropy</label>
