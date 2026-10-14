@@ -2,6 +2,7 @@
 // plus the sample itself when it was painted by hand.
 
 export const MAX_COLOURS = 8;
+export const RECOVERY = ['backtrack', 'restart', 'stop'];
 export const MAX_SAMPLE_SIDE = 24;
 
 export const RANGES = {
@@ -24,6 +25,7 @@ export function defaults() {
     height: RANGES.height.def,
     speed: RANGES.speed.def,
     seed: RANGES.seed.def,
+    recovery: RECOVERY[0],
     custom: null,
   };
 }
@@ -45,6 +47,7 @@ export function sanitize(s) {
   out.seed = clampInt(out.seed, RANGES.seed);
   out.periodicInput = Boolean(out.periodicInput);
   out.periodicOutput = Boolean(out.periodicOutput);
+  out.recovery = RECOVERY.includes(out.recovery) ? out.recovery : d.recovery;
   out.sample = typeof out.sample === 'string' && /^[a-z]+$/.test(out.sample) ? out.sample : d.sample;
   return out;
 }
@@ -71,7 +74,7 @@ export function decodeBitmap(text) {
 
 const KEYS = {
   sample: 's', N: 'n', symmetry: 'y', periodicInput: 'pi', periodicOutput: 'po',
-  width: 'w', height: 'h', speed: 'v', seed: 'r',
+  width: 'w', height: 'h', speed: 'v', seed: 'r', recovery: 'k',
 };
 
 export function toQuery(settings, base = defaults()) {
@@ -94,7 +97,7 @@ export function fromQuery(query, base = defaults()) {
   for (const [k, short] of Object.entries(KEYS)) {
     if (!q.has(short)) continue;
     const v = q.get(short);
-    s[k] = typeof base[k] === 'boolean' ? v === '1' : k === 'sample' ? v : Number(v);
+    s[k] = typeof base[k] === 'boolean' ? v === '1' : typeof base[k] === 'string' ? v : Number(v);
   }
   const out = sanitize(s);
   out.custom = q.has('c') ? decodeBitmap(q.get('c')) : null;

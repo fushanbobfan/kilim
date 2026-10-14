@@ -9,7 +9,7 @@ test('defaults produce an empty query', () => {
 });
 
 test('changed settings round-trip through a query', () => {
-  const s = { ...defaults(), sample: 'maze', N: 2, symmetry: 2, periodicOutput: true, width: 64, seed: 12345 };
+  const s = { ...defaults(), sample: 'maze', N: 2, symmetry: 2, periodicOutput: true, width: 64, seed: 12345, recovery: 'stop' };
   const q = toQuery(s);
   assert.match(q, /s=maze/);
   assert.doesNotMatch(q, /h=/);
@@ -24,6 +24,7 @@ test('sanitize clamps ranges and rejects bad values', () => {
   assert.equal(s.height, 48);
   assert.equal(s.speed, 1);
   assert.equal(s.sample, 'kilim');
+  assert.equal(sanitize({ recovery: 'pray' }).recovery, 'backtrack');
 });
 
 test('a painted sample round-trips and replaces the sample id', () => {

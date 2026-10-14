@@ -121,3 +121,53 @@ test('pattern choice follows the weights', () => {
   for (let i = 0; i < 1600; i++) if (m.observed(i) === 0) zeros++;
   assert.ok(Math.abs(zeros / 1600 - 0.75) < 0.05, `share ${zeros / 1600}`);
 });
+
+function snapshot(m) {
+  return {
+    wave: m.wave.slice(), compatible: m.compatible.slice(), ones: m.sumsOfOnes.slice(),
+    entropies: m.entropies.slice(), decisions: m.decisions,
+  };
+}
+
+test('undo returns the wave, support counts and entropies to a mark exactly', () => {
+  for (const periodic of [true, false]) {
+    const m = makeModel(sampleById('pipes').bitmap, { symmetry: 2, width: 20, height: 16, periodic });
+    m.run(createRng(6), 30);
+    const before = snapshot(m);
+    const mark = m.mark();
+    m.run(createRng(7), 40);
+    assert.ok(m.decisions > before.decisions);
+    m.undo(mark);
+    const after = snapshot(m);
+    assert.deepEqual([...after.wave], [...before.wave]);
+    assert.deepEqual([...after.compatible], [...before.compatible]);
+    assert.deepEqual([...after.ones], [...before.ones]);
+    assert.equal(after.decisions, before.decisions);
+    for (let i = 0; i < before.entropies.length; i++) assert.ok(Math.abs(after.entropies[i] - before.entropies[i]) < 1e-9);
+  }
+});
+
+test('undo to the start gives a fresh model', () => {
+  const b = sampleById('islands').bitmap;
+  const m = makeModel(b, { width: 12, height: 12 });
+  const fresh = snapshot(m);
+  const mark = m.mark();
+  m.run(createRng(1));
+  m.undo(mark);
+  assert.deepEqual([...m.compatible], [...fresh.compatible]);
+  assert.deepEqual([...m.entropies], [...fresh.entropies]);
+  assert.equal(m.progress(), 0);
+});
+
+test('undo clears a contradiction and the run can go on', () => {
+  const m = makeModel(sampleById('maze').bitmap, { width: 10, height: 10 });
+  const mark = m.mark();
+  for (let t = 0; t < m.T; t++) m.ban(0, t);
+  m.propagate();
+  m.status = CONTRADICTION;
+  m.undo(mark);
+  assert.equal(m.status, PROGRESS);
+  assert.equal(m.contradiction, -1);
+  assert.equal(m.progress(), 0);
+  assert.notEqual(m.run(createRng(2)), PROGRESS);
+});

@@ -29,6 +29,9 @@ export class OverlapModel {
     this.entropies = new Float64Array(cells);
     this.stack = new Int32Array(cells * T * 2);
     this.stackSize = 0;
+    // Every ban in order, so choices can be undone back to a mark.
+    this.trail = new Int32Array(cells * T * 2);
+    this.trailSize = 0;
     this.weightLogWeights = new Float64Array(T);
     let sw = 0;
     let swl = 0;
@@ -58,6 +61,7 @@ export class OverlapModel {
       this.entropies[i] = this.startingEntropy;
     }
     this.stackSize = 0;
+    this.trailSize = 0;
     this.contradiction = -1;
     this.lastObserved = -1;
     this.decisions = 0;
@@ -75,8 +79,9 @@ export class OverlapModel {
     const k = i * T + t;
     if (!this.wave[k]) return;
     this.wave[k] = 0;
-    const c = k * 4;
-    this.compatible[c] = this.compatible[c + 1] = this.compatible[c + 2] = this.compatible[c + 3] = 0;
+    this.trail[this.trailSize * 2] = i;
+    this.trail[this.trailSize * 2 + 1] = t;
+    this.trailSize++;
     this.stack[this.stackSize * 2] = i;
     this.stack[this.stackSize * 2 + 1] = t;
     this.stackSize++;
@@ -88,33 +93,78 @@ export class OverlapModel {
     if (this.sumsOfOnes[i] === 0 && this.contradiction < 0) this.contradiction = i;
   }
 
+  // The neighbour one step in direction d, or -1 where propagation stops.
+  neighbour(i, d) {
+    const { W, H, N } = this;
+    const x1 = i % W;
+    let x2 = x1 + DX[d];
+    let y2 = (i - x1) / W + DY[d];
+    if (!this.periodic && (x2 < 0 || y2 < 0 || x2 + N > W || y2 + N > H)) return -1;
+    if (x2 < 0) x2 += W;
+    else if (x2 >= W) x2 -= W;
+    if (y2 < 0) y2 += H;
+    else if (y2 >= H) y2 -= H;
+    return x2 + y2 * W;
+  }
+
+  // Support counts keep falling after a tile is banned; ban() ignores repeats.
+  // That keeps every count a plain sum over banned tiles, so undo can add back.
   propagate() {
-    const { T, W, H, N, propagator, compatible } = this;
+    const { T, propagator, compatible } = this;
     while (this.stackSize > 0) {
       this.stackSize--;
       const i1 = this.stack[this.stackSize * 2];
       const t1 = this.stack[this.stackSize * 2 + 1];
-      const x1 = i1 % W;
-      const y1 = (i1 - x1) / W;
       for (let d = 0; d < 4; d++) {
-        let x2 = x1 + DX[d];
-        let y2 = y1 + DY[d];
-        if (!this.periodic && (x2 < 0 || y2 < 0 || x2 + N > W || y2 + N > H)) continue;
-        if (x2 < 0) x2 += W;
-        else if (x2 >= W) x2 -= W;
-        if (y2 < 0) y2 += H;
-        else if (y2 >= H) y2 -= H;
-        const i2 = x2 + y2 * W;
+        const i2 = this.neighbour(i1, d);
+        if (i2 < 0) continue;
         const list = propagator[d][t1];
         for (let l = 0; l < list.length; l++) {
-          const t2 = list[l];
-          const c = (i2 * T + t2) * 4 + d;
+          const c = (i2 * T + list[l]) * 4 + d;
           compatible[c]--;
-          if (compatible[c] === 0) this.ban(i2, t2);
+          if (compatible[c] === 0) this.ban(i2, list[l]);
         }
       }
     }
     return this.contradiction < 0;
+  }
+
+  mark() {
+    return { trail: this.trailSize, decisions: this.decisions, lastObserved: this.lastObserved };
+  }
+
+  // Unban everything since the mark, newest first, giving back the support
+  // each ban took from its neighbours.
+  undo(mark) {
+    const { T, propagator, compatible } = this;
+    this.stackSize = 0;
+    while (this.trailSize > mark.trail) {
+      this.trailSize--;
+      const i = this.trail[this.trailSize * 2];
+      const t = this.trail[this.trailSize * 2 + 1];
+      for (let d = 0; d < 4; d++) {
+        const i2 = this.neighbour(i, d);
+        if (i2 < 0) continue;
+        const list = propagator[d][t];
+        for (let l = 0; l < list.length; l++) compatible[(i2 * T + list[l]) * 4 + d]++;
+      }
+      this.wave[i * T + t] = 1;
+      this.sumsOfOnes[i]++;
+      if (this.sumsOfOnes[i] === T) {
+        // Snap back to the exact starting sums so rounding cannot build up.
+        this.sumsOfWeights[i] = this.startingWeight;
+        this.sumsOfWeightLogWeights[i] = this.startingWeightLog;
+      } else {
+        this.sumsOfWeights[i] += this.weights[t];
+        this.sumsOfWeightLogWeights[i] += this.weightLogWeights[t];
+      }
+      const sw = this.sumsOfWeights[i];
+      this.entropies[i] = Math.log(sw) - this.sumsOfWeightLogWeights[i] / sw;
+    }
+    this.decisions = mark.decisions;
+    this.lastObserved = mark.lastObserved;
+    this.contradiction = -1;
+    this.status = PROGRESS;
   }
 
   // Least-entropy undecided cell, ties broken by a little noise; -1 when all are decided.
@@ -237,3 +287,4 @@ export function isConsistent(model) {
   }
   return true;
 }
+
